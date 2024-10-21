@@ -14,7 +14,33 @@ You should see the combined calendar output starting with `BEGIN:VCALENDAR` with
 
 <img src="https://user-images.githubusercontent.com/1694586/233532371-a316e691-634b-4850-9a91-3b6f14b03ef6.png" width="500">
 
+You can check that the output is valid here: https://icalendar.org/validator.html
+
 ## NOTES
 
 1. Every time the URL is polled, the calendars are re-downloaded and combined and served out, there is no caching currently, which is not needed because 👇
 1. Google Calendar does not poll frequently, seems to be every ~12 hours or so, which is annoying when there's a change and you want it to show up
+
+## Running without docker
+
+### Development
+
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+FLASK_ENV=development FLASK_APP=app.py flask run --host 0.0.0.0
+```
+
+### Production
+
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+---
+
+This code was originally forked from: <https://github.com/jessejoe/webcal-combiner> which is licensed MIT.

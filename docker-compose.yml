@@ -9,3 +9,5 @@ services:
             dockerfile: Dockerfile
         ports:
             - "8080:5000"
+        volumes:
+            - ./config.json:/app/config.json:ro

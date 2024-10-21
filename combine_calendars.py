@@ -41,7 +41,7 @@ def generate_combined_calendar(name: str, calendars: list):
         for event in calendar_obj.events:
             # Prepend calendar name to event name to make calendars easier to identify
             if calendar.name:
-                event.name = f'[{calendar.name}] {event.name}'
+                event.name = f'{event.name} [{calendar.name}] '
             logging.info('New event name: %s', event.name)
 
             # 'X-APPLE-STRUCTURED-LOCATION' is used by band.us webcals and breaks Google Calendar, even though it works

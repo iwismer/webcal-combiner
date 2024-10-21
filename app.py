@@ -53,7 +53,7 @@ def combine_calendar(key, cal_name):
         return make_response("Not Authorized", 401)
     if cal_name not in served_calendars:
         return make_response("Not Found", 404)
-    response =  make_response(generate_combined_calendar(cal_name, served_calendars[cal_name]).serialize())
+    response =  make_response(generate_combined_calendar(cal_name, served_calendars[cal_name]))
     response.headers["Content-Disposition"] = "attachment; filename=calendar.ics"
     response.headers['Content-Type'] = 'text/calendar'
     return response

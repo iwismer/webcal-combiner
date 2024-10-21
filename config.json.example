@@ -1,5 +1,6 @@
 {
   "key": "foobar",
+  "url": "https://cal.example.com",
   "calendars": [
     {
       "name": "Hockey",

@@ -24,10 +24,24 @@ for calendar in config['calendars']:
     served_calendars[calendar['name']] = existing_calendars
 
 server_key = config["key"]
+url = config['url']
 
 @app.route('/')
 def empty_response():
     response = make_response('', 200)
+    return response
+
+
+@app.route('/listing')
+def listing():
+    res_str = ""
+    for cal, sub_cals in served_calendars.items():
+        res_str = res_str + f"{cal}\n{url}/calendar/{server_key}/{cal}\n\n"
+        for sub_cal in sub_cals:
+            res_str = res_str + f"{sub_cal.name}: {sub_cal.description}\n{sub_cal.url}\n"
+        res_str = res_str + "\n------\n\n"
+    response = make_response(res_str, 200)
+    response.headers['Content-Type'] = 'text/plain'
     return response
 
 @app.route("/calendar/<key>/<cal_name>")

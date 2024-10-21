@@ -44,3 +44,4 @@ gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ---
 
 This code was originally forked from: <https://github.com/jessejoe/webcal-combiner> which is licensed MIT.
+I also switched to use `icalendar` instead of `ics` after running into bugs in `ics` and seeing how to use `icalendar` in https://github.com/LukasForst/camerge which is also MIT.

@@ -1,4 +1,5 @@
 {
+  "key": "foobar",
   "calendars": [
     {
       "name": "Hockey",

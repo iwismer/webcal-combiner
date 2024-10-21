@@ -23,16 +23,20 @@ for calendar in config['calendars']:
         existing_calendars.append(existing_calendar)
     served_calendars[calendar['name']] = existing_calendars
 
+server_key = config["key"]
+
 @app.route('/')
 def empty_response():
     response = make_response('', 200)
     return response
 
-@app.route("/calendar/<cal_name>")
-def combine_calendar(cal_name):
+@app.route("/calendar/<key>/<cal_name>")
+def combine_calendar(key, cal_name):
     """
     Return combined calendar in ics format
     """
+    if key != server_key:
+        return make_response("Not Authorized", 401)
     if cal_name not in served_calendars:
         return make_response("Not Found", 404)
     response =  make_response(generate_combined_calendar(cal_name, served_calendars[cal_name]).serialize())

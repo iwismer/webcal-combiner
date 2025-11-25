@@ -72,7 +72,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(health_check))
         .route("/listing", get(listing))
-        .route("/calendar/:key/:cal_name", get(get_calendar))
+        .route("/calendar/{key}/{cal_name}", get(get_calendar))
         .layer(SetResponseHeaderLayer::if_not_present(
             header::SERVER,
             header::HeaderValue::from_static("webcal-combiner-rust"),
@@ -106,7 +106,7 @@ async fn listing(State(state): State<AppState>) -> impl IntoResponse {
 
     for group in &state.config.calendars {
         output.push_str(&format!(
-            "{}: {}/calendar/<key>/{}\n",
+            "{}: {}/calendar/{{key}}/{}\n",
             group.name, state.config.url, group.name
         ));
 

@@ -95,70 +95,67 @@ impl CalendarService {
             fetched_calendars.push((calendars[idx].name.clone(), result?));
         }
 
-        // Create new combined calendar
-        let mut combined_cal = Calendar::new();
-        combined_cal
-            .append_property(icalendar::Property::new("PRODID", name))
-            .append_property(icalendar::Property::new("VERSION", "2.0"))
-            .append_property(icalendar::Property::new("NAME", name))
-            .append_property(icalendar::Property::new("X-WR-CALNAME", name));
+        // --- String-based merging ---
+        let mut combined_cal_string = String::new();
+        combined_cal_string.push_str("BEGIN:VCALENDAR\n");
+        combined_cal_string.push_str(&format!("PRODID:{}\n", name));
+        combined_cal_string.push_str("VERSION:2.0\n");
+        combined_cal_string.push_str(&format!("NAME:{}\n", name));
+        combined_cal_string.push_str(&format!("X-WR-CALNAME:{}\n", name));
 
-        // Process each fetched calendar
-        for (source_name, cal_text) in fetched_calendars {
-            let parsed = cal_text
-                .parse::<Calendar>()
-                .map_err(|e| anyhow::anyhow!("Failed to parse calendar '{}': {}", source_name, e))?;
+        let mut all_timezones = std::collections::HashMap::new();
+        let mut all_events = Vec::new();
 
-            // Iterate through components
-            for component in parsed.components {
-                match component {
-                    CalendarComponent::Event(mut event) => {
-                        // Modify the summary to add the source prefix
-                        if let Some(summary_prop) = event.property_value("SUMMARY") {
-                            let new_summary = format!("{} [{}]", summary_prop, source_name);
-                            event.summary(&new_summary);
-                        }
-                        combined_cal.push(event);
-                    }
-                    // Note: The icalendar crate doesn't expose Timezone as a separate enum variant
-                    // Timezones are handled internally, so we only need to handle events
-                    _ => {
-                        // Ignore other component types (alarms, journals, todos, timezones, etc.)
-                    }
+        let re_tz = Regex::new(r"(?ms)BEGIN:VTIMEZONE.*?END:VTIMEZONE").unwrap();
+        let re_event = Regex::new(r"(?ms)BEGIN:VEVENT.*?END:VEVENT").unwrap();
+        let re_summary = Regex::new(r"SUMMARY:(.*)").unwrap();
+
+        for (source_name, cal_text) in &fetched_calendars {
+            // Extract timezones
+            for cap in re_tz.captures_iter(cal_text) {
+                let tz_text = cap.get(0).unwrap().as_str();
+                if let Some(tzid_match) = Regex::new(r"TZID:(.*)").unwrap().captures(tz_text) {
+                    let tzid = tzid_match.get(1).unwrap().as_str().trim();
+                    all_timezones.entry(tzid.to_string()).or_insert_with(|| tz_text.to_string());
                 }
+            }
+
+            // Extract and modify events
+            for cap in re_event.captures_iter(cal_text) {
+                let event_text = cap.get(0).unwrap().as_str();
+                let new_event_text = if let Some(summary_match) = re_summary.captures(event_text) {
+                    let original_summary = summary_match.get(1).unwrap().as_str();
+                    let new_summary = format!("SUMMARY:{} [{}]", original_summary, source_name);
+                    event_text.replacen(summary_match.get(0).unwrap().as_str(), &new_summary, 1)
+                } else {
+                    event_text.to_string()
+                };
+                all_events.push(new_event_text);
             }
         }
 
-        Ok(combined_cal.to_string())
+        // Append unique timezones
+        for tz_text in all_timezones.values() {
+            combined_cal_string.push_str(tz_text);
+            combined_cal_string.push('\n');
+        }
+
+        // Append events
+        for event_text in &all_events {
+            combined_cal_string.push_str(event_text);
+            combined_cal_string.push('\n');
+        }
+
+        combined_cal_string.push_str("END:VCALENDAR\n");
+
+        Ok(combined_cal_string)
     }
 
     pub async fn combine_all_calendars(
         &self,
-        calendar_groups: &[(String, Vec<SourceCalendar>)],
+        calendars: &[SourceCalendar],
     ) -> Result<String> {
-        // Fetch all calendar groups in parallel
-        let fetch_tasks: Vec<_> = calendar_groups
-            .iter()
-            .map(|(name, calendars)| {
-                let service = self.clone();
-                let name = name.clone();
-                let calendars = calendars.clone();
-                tokio::spawn(async move {
-                    service
-                        .generate_combined_calendar(&name, &calendars)
-                        .await
-                })
-            })
-            .collect();
-
-        // Wait for all to complete
-        let mut combined_calendars = Vec::new();
-        for task in fetch_tasks {
-            let result = task.await.context("Task panicked")?;
-            combined_calendars.push(result?);
-        }
-
-        // Join all calendars with newlines
-        Ok(combined_calendars.join("\n"))
+        self.generate_combined_calendar("all-calendars", calendars)
+            .await
     }
 }

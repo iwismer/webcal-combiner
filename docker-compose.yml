@@ -11,3 +11,10 @@ services:
             - "8080:5000"
         volumes:
             - ./config.json:/app/config.json:ro
+        environment:
+            # Optional: Override the key from config.json
+            # - WEBCAL_KEY=your-secret-key
+            # Optional: Enable 5-minute calendar caching
+            # - ENABLE_CACHE=true
+            # Optional: Set log level (trace, debug, info, warn, error)
+            - RUST_LOG=info

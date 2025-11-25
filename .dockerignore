@@ -1,0 +1,27 @@
+# Python files (no longer needed)
+*.py
+__pycache__/
+*.pyc
+requirements.txt
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+MIGRATION.md
+
+# Config (mounted at runtime)
+config.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

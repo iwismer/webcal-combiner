@@ -44,6 +44,20 @@ def listing():
     response.headers['Content-Type'] = 'text/plain'
     return response
 
+def combine_all_calendars():
+    """
+    Return all the calendars in a single ics file
+    """
+    
+    combined = []
+    for cal in served_calendars.keys():
+        generated_cal = generate_combined_calendar(cal, served_calendars[cal])
+        combined.append(generated_cal)
+    response =  make_response('\n'.join(combined))
+    response.headers["Content-Disposition"] = "attachment; filename=all-calendars.ics"
+    response.headers['Content-Type'] = 'text/calendar'
+    return response
+
 @app.route("/calendar/<key>/<cal_name>")
 def combine_calendar(key, cal_name):
     """
@@ -51,7 +65,9 @@ def combine_calendar(key, cal_name):
     """
     if key != server_key:
         return make_response("Not Authorized", 401)
-    if cal_name not in served_calendars:
+    if cal_name == 'all-calendars':
+        return combine_all_calendars()
+    elif cal_name not in served_calendars:
         return make_response("Not Found", 404)
     response =  make_response(generate_combined_calendar(cal_name, served_calendars[cal_name]))
     response.headers["Content-Disposition"] = "attachment; filename=calendar.ics"

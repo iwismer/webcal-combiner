@@ -97,34 +97,40 @@ impl CalendarService {
 
         // --- String-based merging ---
         let mut combined_cal_string = String::new();
-        combined_cal_string.push_str("BEGIN:VCALENDAR\n");
-        combined_cal_string.push_str(&format!("PRODID:{}\n", name));
-        combined_cal_string.push_str("VERSION:2.0\n");
-        combined_cal_string.push_str(&format!("NAME:{}\n", name));
-        combined_cal_string.push_str(&format!("X-WR-CALNAME:{}\n", name));
+        combined_cal_string.push_str("BEGIN:VCALENDAR\r\n");
+        combined_cal_string.push_str(&format!("PRODID:{}\r\n", name));
+        combined_cal_string.push_str("VERSION:2.0\r\n");
+        combined_cal_string.push_str(&format!("NAME:{}\r\n", name));
+        combined_cal_string.push_str(&format!("X-WR-CALNAME:{}\r\n", name));
 
         let mut all_timezones = std::collections::HashMap::new();
         let mut all_events = Vec::new();
 
+        let unfold_re = Regex::new(r"\r?\n[ \t]").unwrap();
         let re_tz = Regex::new(r"(?ms)BEGIN:VTIMEZONE.*?END:VTIMEZONE").unwrap();
         let re_event = Regex::new(r"(?ms)BEGIN:VEVENT.*?END:VEVENT").unwrap();
         let re_summary = Regex::new(r"SUMMARY:(.*)").unwrap();
+        let re_tzid = Regex::new(r"TZID:(.*)").unwrap();
 
         for (source_name, cal_text) in &fetched_calendars {
+            // Pre-process to "unfold" long lines and normalize all line endings to \n
+            let unfolded_cal_text = unfold_re.replace_all(cal_text, "");
+            let normalized_cal_text = unfolded_cal_text.replace("\r\n", "\n");
+
             // Extract timezones
-            for cap in re_tz.captures_iter(cal_text) {
+            for cap in re_tz.captures_iter(&normalized_cal_text) {
                 let tz_text = cap.get(0).unwrap().as_str();
-                if let Some(tzid_match) = Regex::new(r"TZID:(.*)").unwrap().captures(tz_text) {
+                if let Some(tzid_match) = re_tzid.captures(tz_text) {
                     let tzid = tzid_match.get(1).unwrap().as_str().trim();
                     all_timezones.entry(tzid.to_string()).or_insert_with(|| tz_text.to_string());
                 }
             }
 
             // Extract and modify events
-            for cap in re_event.captures_iter(cal_text) {
+            for cap in re_event.captures_iter(&normalized_cal_text) {
                 let event_text = cap.get(0).unwrap().as_str();
                 let new_event_text = if let Some(summary_match) = re_summary.captures(event_text) {
-                    let original_summary = summary_match.get(1).unwrap().as_str();
+                    let original_summary = summary_match.get(1).unwrap().as_str().trim();
                     let new_summary = format!("SUMMARY:{} [{}]", original_summary, source_name);
                     event_text.replacen(summary_match.get(0).unwrap().as_str(), &new_summary, 1)
                 } else {
@@ -134,19 +140,19 @@ impl CalendarService {
             }
         }
 
-        // Append unique timezones
+        // Append unique timezones, ensuring CRLF endings
         for tz_text in all_timezones.values() {
-            combined_cal_string.push_str(tz_text);
-            combined_cal_string.push('\n');
+            combined_cal_string.push_str(&tz_text.trim().replace('\n', "\r\n"));
+            combined_cal_string.push_str("\r\n");
         }
 
-        // Append events
+        // Append events, ensuring CRLF endings
         for event_text in &all_events {
-            combined_cal_string.push_str(event_text);
-            combined_cal_string.push('\n');
+            combined_cal_string.push_str(&event_text.trim().replace('\n', "\r\n"));
+            combined_cal_string.push_str("\r\n");
         }
 
-        combined_cal_string.push_str("END:VCALENDAR\n");
+        combined_cal_string.push_str("END:VCALENDAR\r\n");
 
         Ok(combined_cal_string)
     }

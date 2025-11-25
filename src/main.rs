@@ -33,8 +33,16 @@ async fn main() {
         .init();
 
     // Load configuration
-    let config = Config::load("config.json").expect("Failed to load config.json");
-    tracing::info!("Configuration loaded successfully");
+    let config = match Config::load("config.json") {
+        Ok(config) => {
+            tracing::info!("Configuration loaded successfully");
+            Arc::new(config)
+        }
+        Err(e) => {
+            tracing::error!("Failed to load config.json: {:?}", e);
+            std::process::exit(1);
+        }
+    };
 
     // Check if caching is enabled
     let enable_cache = std::env::var("ENABLE_CACHE")
@@ -49,13 +57,16 @@ async fn main() {
     }
 
     // Create calendar service
-    let calendar_service = CalendarService::new(enable_cache);
+    let calendar_service = CalendarService::new(enable_cache, Arc::clone(&config));
 
     // Create shared state
     let state = AppState {
-        config: Arc::new(config),
+        config,
         calendar_service,
     };
+
+    // Get server port
+    let server_port = state.config.server_port;
 
     // Build router
     let app = Router::new()
@@ -69,15 +80,21 @@ async fn main() {
         .with_state(state);
 
     // Start server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:5000")
-        .await
-        .expect("Failed to bind to port 5000");
+    let addr = format!("0.0.0.0:{}", server_port);
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            tracing::error!("Failed to bind to port {}: {:?}", server_port, e);
+            std::process::exit(1);
+        }
+    };
 
-    tracing::info!("Server listening on 0.0.0.0:5000");
+    tracing::info!("Server listening on {}", addr);
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server failed to start");
+    if let Err(e) = axum::serve(listener, app).await {
+        tracing::error!("Server failed to start: {:?}", e);
+        std::process::exit(1);
+    }
 }
 
 async fn health_check() -> impl IntoResponse {

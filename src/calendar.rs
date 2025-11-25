@@ -1,7 +1,7 @@
 use crate::config::SourceCalendar;
 use anyhow::{Context, Result};
-use icalendar::{Component, Calendar, CalendarComponent};
 use moka::future::Cache;
+use regex::Regex;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
@@ -10,26 +10,27 @@ use tokio::time::timeout;
 pub struct CalendarService {
     client: reqwest::Client,
     cache: Option<Arc<Cache<String, String>>>,
+    config: Arc<crate::config::Config>,
 }
 
 impl CalendarService {
-    pub fn new(enable_cache: bool) -> Self {
+    pub fn new(enable_cache: bool, config: Arc<crate::config::Config>) -> Self {
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(config.request_timeout_seconds))
             .build()
             .expect("Failed to create HTTP client");
 
         let cache = if enable_cache {
             Some(Arc::new(
                 Cache::builder()
-                    .time_to_live(Duration::from_secs(300)) // 5 minutes default
+                    .time_to_live(Duration::from_secs(config.cache_ttl_seconds))
                     .build(),
             ))
         } else {
             None
         };
 
-        Self { client, cache }
+        Self { client, cache, config }
     }
 
     async fn fetch_calendar(&self, url: &str) -> Result<String> {
@@ -44,8 +45,8 @@ impl CalendarService {
         tracing::debug!("Fetching calendar from URL: {}", url);
 
         let response = timeout(
-            Duration::from_secs(30),
-            self.client.get(url).send()
+            Duration::from_secs(self.config.request_timeout_seconds),
+            self.client.get(url).send(),
         )
         .await
         .context("Request timed out")?

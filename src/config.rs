@@ -20,7 +20,27 @@ pub struct CalendarGroup {
 pub struct Config {
     pub key: String,
     pub url: String,
+    #[serde(default = "default_server_port")]
+    pub server_port: u16,
+    #[serde(default = "default_cache_ttl")]
+    pub cache_ttl_seconds: u64,
+    #[serde(default = "default_request_timeout")]
+    pub request_timeout_seconds: u64,
     pub calendars: Vec<CalendarGroup>,
+    #[serde(skip)]
+    pub calendar_map: HashMap<String, Vec<SourceCalendar>>,
+}
+
+fn default_server_port() -> u16 {
+    5000
+}
+
+fn default_cache_ttl() -> u64 {
+    300
+}
+
+fn default_request_timeout() -> u64 {
+    30
 }
 
 impl Config {
@@ -36,20 +56,23 @@ impl Config {
             config.key = env_key;
         }
 
+        // Pre-compute the calendar map
+        config.calendar_map = config.calendars
+            .iter()
+            .map(|group| (group.name.clone(), group.calendars.clone()))
+            .collect();
+
         Ok(config)
     }
 
-    pub fn get_calendar_map(&self) -> HashMap<String, Vec<SourceCalendar>> {
-        self.calendars
-            .iter()
-            .map(|group| (group.name.clone(), group.calendars.clone()))
-            .collect()
+    pub fn get_calendar_map(&self) -> &HashMap<String, Vec<SourceCalendar>> {
+        &self.calendar_map
     }
 
-    pub fn get_all_calendars(&self) -> Vec<(String, Vec<SourceCalendar>)> {
+    pub fn get_all_calendars(&self) -> Vec<SourceCalendar> {
         self.calendars
             .iter()
-            .map(|group| (group.name.clone(), group.calendars.clone()))
+            .flat_map(|group| group.calendars.clone())
             .collect()
     }
 }
